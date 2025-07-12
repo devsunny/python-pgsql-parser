@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="python-pgsql-parser",
-    version="0.1.0",
+    version="0.1.1",
     author="Sunny Liu",
     author_email="sunnyliu2@gmail.com",
     description="Advanced PostgreSQL SQL parser for extracting database schema metadata",
