@@ -37,8 +37,8 @@ class TestSQLLexer:
         sql = "WHERE name = 'John''s Cafe';"
         tokens = lexer.tokenize(sql)
         
-        assert tokens[4].token_type == TokenType.STRING_LITERAL
-        assert tokens[4].value == "'John''s Cafe'"
+        assert tokens[3].token_type == TokenType.STRING_LITERAL
+        assert tokens[3].value == "'John''s Cafe'"
 
     def test_numeric_literals(self):
         lexer = SQLLexer()
@@ -63,8 +63,8 @@ class TestSQLLexer:
         
         assert tokens[0].token_type == TokenType.COMMENT
         assert tokens[0].value == "-- This is a comment"
-        assert tokens[5].token_type == TokenType.COMMENT
-        assert tokens[5].value.startswith("/* Multi-line")
+        assert tokens[6].token_type == TokenType.COMMENT
+        assert tokens[6].value.startswith("/* Multi-line")
 
     def test_split_statements(self):
         lexer = SQLLexer()
@@ -205,7 +205,8 @@ class TestSQLParser:
         assert table is not None
         assert table.is_view
         assert not table.is_materialized
-        assert "SELECT id, name" in table.view_definition
+        
+        assert "SELECT id , name" in table.view_definition
 
     def test_create_materialized_view(self, parser):
         sql = """

@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Dict, Optional, Tuple, Any, Generator, Union
 
 class TokenType(Enum):
+    HIDDEN = 0
     KEYWORD = 1
     IDENTIFIER = 2
     QUOTED_IDENTIFIER = 3
@@ -11,6 +12,7 @@ class TokenType(Enum):
     OPERATOR = 6
     PUNCTUATION = 7
     COMMENT = 8
+    BLOCK_CONTROL = 9
 
 class Token:
     __slots__ = ('token_type', 'value', 'position')
@@ -28,7 +30,7 @@ class SQLLexer:
         self.keywords = [
             # Data types
             'INT', 'INTEGER', 'SMALLINT', 'BIGINT', 'SERIAL', 'BIGSERIAL', 
-            'VARCHAR', 'CHAR', 'TEXT', 'BOOLEAN', 'NUMERIC', 'DECIMAL', 
+            'VARCHAR', 'CHARACTER', 'VARYING',  'CHAR', 'TEXT', 'BOOLEAN', 'NUMERIC', 'DECIMAL', 
             'REAL', 'FLOAT', 'DOUBLE', 'PRECISION', 'DATE', 'TIME', 'TIMESTAMP', 
             'INTERVAL', 'JSON', 'JSONB', 'UUID', 'BYTEA',
             # DDL commands
@@ -50,13 +52,13 @@ class SQLLexer:
             # Functions
             'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'DISTINCT',
             # Control
-            'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+            'BEGIN', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
             # Other
             'AS', 'ASC', 'DESC', 'WITH', 'WITHOUT', 'TIME', 'ZONE', 'IF', 
             'EXISTS', 'CASCADE', 'RESTRICT', 'ADD', 'RENAME', 'TO', 'COLUMN',
             # PostgreSQL specific
             'TEMPORARY', 'TEMP', 'VIEW', 'MATERIALIZED', 'UNLOGGED', 'INDEX',
-            'CONCURRENTLY', 'USING', 'UNIQUE', 'CLUSTER', 'WITH'
+            'CONCURRENTLY', 'USING', 'UNIQUE', 'CLUSTER', 'WITH'            
         ]
         # Sort keywords by length (descending) for regex priority
         self.keywords.sort(key=len, reverse=True)
@@ -70,6 +72,7 @@ class SQLLexer:
             (TokenType.OPERATOR, r'\|\||\*\*|->>|->|#>>|#>|::|!=|>=|<=|<>|[-+*/%<>=~!@#^&|?]'),
             (TokenType.PUNCTUATION, r'[(),;.]'),
             (TokenType.IDENTIFIER, r'[a-zA-Z_][a-zA-Z0-9_]*'),
+            (TokenType.BLOCK_CONTROL, r'[$]{2}'),
         ]
         # Build master regex with DOTALL to handle multi-line tokens
         regex_parts = [f'(?P<{tok.name}>{pat})' for tok, pat in self.token_specs]
@@ -78,7 +81,7 @@ class SQLLexer:
         # Set for quick keyword lookups (case-insensitive)
         self.keyword_set = {kw.lower() for kw in self.keywords}
 
-    def tokenize(self, sql: str) -> List[Token]:
+    def tokenize(self, sql: str, include_space: bool = False) -> List[Token]:
         tokens = []
         pos = 0
         line_start = 0
@@ -87,6 +90,9 @@ class SQLLexer:
         while pos < len(sql):
             # Handle whitespace and newlines
             if sql[pos].isspace():
+                if include_space is True:
+                    # print(Token(TokenType.HIDDEN, sql[pos], pos))
+                    tokens.append(Token(TokenType.HIDDEN, sql[pos], pos))
                 if sql[pos] == '\n':
                     line_start = pos + 1
                     line_num += 1
@@ -107,51 +113,49 @@ class SQLLexer:
             # Convert unquoted identifiers to keywords if they match
             if token_type == TokenType.IDENTIFIER and value.lower() in self.keyword_set:
                 token_type = TokenType.KEYWORD
-            
-            tokens.append(Token(token_type, value, pos))
+            token = Token(token_type, value, pos)
+            # print(token)
+            tokens.append(token)
             pos = match.end()
-        
+       
+            
         return tokens
 
-    @staticmethod
-    def split_sql_statements(sql: str) -> List[str]:
+    
+    def split_sql_statements(self, sql: str) -> List[str]:
         """Split SQL script into individual statements"""
         # Remove comments
         sql = re.sub(r'--.*?$', '', sql, flags=re.MULTILINE)
         sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
         
         # Split on semicolons that are outside of quotes and parentheses
+        tokens = self.tokenize(sql.strip(), include_space=True)
         statements = []
         current = []
         depth = 0
-        in_quote = False
-        quote_char = None
+        in_blocks = []
         
-        for char in sql:
-            if char in ('"', "'") and not in_quote:
-                in_quote = True
-                quote_char = char
-            elif char == quote_char and in_quote:
-                in_quote = False
-                quote_char = None
-            elif char in ('(', '['):
-                depth += 1
-            elif char in (')', ']'):
-                depth = max(0, depth - 1)
-            
-            if char == ';' and not in_quote and depth == 0:
-                stmt = ''.join(current).strip()
-                if stmt:
-                    statements.append(stmt)
+        for token in tokens:            
+            if token.token_type == TokenType.BLOCK_CONTROL and not in_blocks:
+                in_blocks.append(True)
+                current.append(token)
+            elif token.token_type == TokenType.BLOCK_CONTROL and in_blocks:
+                in_blocks.pop()
+                current.append(token)
+            elif in_blocks:
+                current.append(token)
+            elif not in_blocks and token.token_type == TokenType.PUNCTUATION and token.value==';':
+                
+                statement = "".join([ tok.value for tok in current]).strip()
+                if statement:
+                    statements.append(statement)
                 current = []
             else:
-                current.append(char)
-        
-        # Add last statement if exists
-        final_stmt = ''.join(current).strip()
+               current.append(token) 
+                                   
+        final_stmt = "".join([ tok.value for tok in current]).strip()
         if final_stmt:
             statements.append(final_stmt)
-            
         return statements
 
 # Parser Implementation
@@ -231,7 +235,7 @@ class Index:
 
 class Table:
     __slots__ = ('database', 'schema', 'name', 'table_type', 'columns', 
-                 'primary_key', 'foreign_keys', 'constraints', 'is_view',
+                  'primary_key', 'foreign_keys', 'constraints', 'is_view',
                  'view_definition', 'is_materialized')
     
     def __init__(self, name: str, schema: Optional[str] = None, 
@@ -240,14 +244,15 @@ class Table:
         self.schema = schema
         self.name = name
         self.table_type = table_type
-        self.columns: Dict[str, Column] = {}
-        self.primary_key: Optional[PrimaryKey] = None
+        self.primary_key = None
+        self.columns: Dict[str, Column] = {}        
         self.foreign_keys: List[ForeignKey] = []
         self.constraints: List[Constraint] = []
         self.is_view = False
         self.view_definition: Optional[str] = None
         self.is_materialized = False
     
+        
     def add_column(self, column: Column):
         self.columns[column.name] = column
     
@@ -277,8 +282,11 @@ class SQLParser:
     def parse_script(self, sql_script: str) -> None:
         """Parse entire SQL script"""
         self.statements = self.lexer.split_sql_statements(sql_script)
-        for stmt in self.statements:
+        for stmt in self.statements:            
             self.parse_statement(stmt)
+            
+                
+            
     
     def statement_generator(self, sql_script: str) -> Generator[str, None, None]:
         """Generator to iterate through SQL statements"""
@@ -289,8 +297,10 @@ class SQLParser:
     def parse_statement(self, sql: str) -> Optional[Table]:
         """Parse a single SQL statement"""
         self.tokens = self.lexer.tokenize(sql)
-        self.current = 0
+        # for tok in self.tokens:
+        #     print(tok)
         
+        self.current = 0
         try:
             if self.match('CREATE'):
                 return self.parse_create()
@@ -339,17 +349,18 @@ class SQLParser:
         table_name, schema, database = self.parse_object_name()
         
         # Create table object
-        table = self.get_table(table_name, schema, database)
-        if table is None:
+        table = self.get_table(table_name, schema, database)        
+        if table is None:            
             table = Table(
                 name=table_name,
                 schema=schema,
                 database=database,
                 table_type=table_type
-            )
+            )          
             self.add_table(table)
-        
-        table.is_view = is_view
+            
+        #import pdb;pdb.set_trace()
+        table.is_view = is_view or is_materialized 
         table.is_materialized = is_materialized
         if is_temp:
             table.table_type = 'TEMPORARY ' + table.table_type
@@ -363,7 +374,12 @@ class SQLParser:
             # Parse table definition
             if self.match('('):
                 self.parse_table_elements()
-                self.consume(')', "Expected ')' after table definition")
+                self.consume(')', "Expected ')' after table definition")                
+                if self.current_table.primary_key is None and self.current_table.columns:
+                    pk_cols = [col.name for col in self.current_table.columns.values() if col.is_primary]
+                    if pk_cols:
+                        self.current_table.primary_key = PrimaryKey(None, pk_cols)
+                
             elif self.match('AS'):
                 # CREATE TABLE AS SELECT
                 table.view_definition = self.parse_remaining()
@@ -374,6 +390,8 @@ class SQLParser:
                 break
             self.advance()
         
+        
+                
         return table
     
     def parse_create_view(self):
@@ -521,11 +539,11 @@ class SQLParser:
             self.add_table(self.current_table)
     
     def parse_table_elements(self):
-        """Parse elements inside table definition (columns, constraints)"""
-        while not self.check(')') and not self.is_at_end():
+        """Parse elements inside table definition (columns, constraints)"""              
+        while not self.check(')') and not self.is_at_end():            
             if self.match('CONSTRAINT'):
                 self.parse_constraint()
-            elif self.check(TokenType.QUOTED_IDENTIFIER) or self.check(TokenType.IDENTIFIER):
+            elif self.check(TokenType.QUOTED_IDENTIFIER) or self.check(TokenType.IDENTIFIER):                
                 self.parse_column_definition()
             elif self.match('PRIMARY'):
                 self.parse_primary_key()
@@ -543,10 +561,12 @@ class SQLParser:
     
     def parse_column_definition(self, column: Optional[Column] = None):
         """Parse a column definition"""
+        print("---------col--------------", self.peek())
         if column is None:
             # Parse column name
             col_name = self.consume_identifier()
             column = Column(col_name)
+            print("Adding column", column)
             self.current_table.add_column(column)
         
         # Parse data type
@@ -554,24 +574,29 @@ class SQLParser:
         column.data_type = data_type
         
         # Handle type parameters
-        if data_type in ['varchar', 'char', 'character'] and params:
+        if data_type in ['varchar', 'char', 'character', 'character varying'] and params:
             column.char_length = int(params[0])
-        elif data_type in ['numeric', 'decimal'] and params:
+        elif data_type in ['numeric', 'decimal', 'number'] and params:
             column.numeric_precision = int(params[0]) if len(params) > 0 else None
             column.numeric_scale = int(params[1]) if len(params) > 1 else None
+       
         
-        # Parse column constraints
-        while not self.check(',') and not self.check(')') and not self.is_at_end():
-            if self.match('CONSTRAINT'):
-                constr_name = self.consume_identifier()
-            else:
-                constr_name = None
-            
+        # Parse column constraints        
+        if self.check(',') or self.check(')') or self.is_at_end():
+            return
+        if self.match('CONSTRAINT'):
+            constr_name = self.consume_identifier()
+        else:
+            constr_name = None
+        
+        while not (self.check(',') or self.check(')') or self.is_at_end()):                
+            #print("DEBUG-----", self.peek())
             if self.match('PRIMARY'):
                 self.consume('KEY', "Expected KEY after PRIMARY")
                 column.is_primary = True
-                # Add to constraint list
-                if constr_name:
+                column.primary_key_position = 1
+                # Add to constraint list 
+                if constr_name is not None:
                     self.current_table.constraints.append(
                         Constraint(constr_name, 'PRIMARY KEY', columns=[column.name]))
             elif self.match('REFERENCES'):
@@ -601,7 +626,7 @@ class SQLParser:
                 self.advance()
     
     def parse_foreign_key_ref(self, column: Column, constraint_name: Optional[str]):
-        ref_table, ref_schema, ref_db = self.parse_object_name()
+        ref_table, ref_schema, ref_db = self.parse_object_name()        
         ref_col = None
         
         if self.match('('):
@@ -621,8 +646,7 @@ class SQLParser:
         column.foreign_key_ref = (ref_table, ref_col or column.name, constraint_name)
     
     def parse_primary_key(self):
-        self.consume('KEY', "Expected KEY after PRIMARY")
-        
+        self.consume('KEY', "Expected KEY after PRIMARY")        
         if self.match('('):
             columns = []
             while not self.check(')') and not self.is_at_end():
@@ -674,7 +698,7 @@ class SQLParser:
         name = self.try_get_constraint_name()
         
         # Add foreign key
-        fk = ForeignKey(name, columns, ref_table, ref_columns)
+        fk = ForeignKey(name, columns, ref_table, ref_columns)        
         self.current_table.foreign_keys.append(fk)
     
     def parse_unique_constraint(self):
@@ -710,9 +734,11 @@ class SQLParser:
             if self.current_table.primary_key:
                 self.current_table.primary_key.name = constr_name
         elif self.match('FOREIGN'):
+            print("Here ................", len(self.current_table.foreign_keys))
             self.parse_foreign_key()
             if self.current_table.foreign_keys and self.current_table.foreign_keys[-1].name is None:
                 self.current_table.foreign_keys[-1].name = constr_name
+        
         elif self.match('UNIQUE'):
             self.parse_unique_constraint()
             if self.current_table.constraints and self.current_table.constraints[-1].name is None:
@@ -732,13 +758,26 @@ class SQLParser:
         params = []
         
         # Read data type name
-        while self.match(TokenType.IDENTIFIER) or self.match(TokenType.QUOTED_IDENTIFIER):
-            type_tokens.append(self.previous().value)
-            if not self.check('('):
-                break
         
-        data_type = ' '.join(type_tokens).lower()
+        type_first_token = None  
         
+        if self.match(TokenType.IDENTIFIER) or self.match(TokenType.QUOTED_IDENTIFIER) or self.match(TokenType.KEYWORD):            
+            type_first_token = self.previous()
+            type_tokens.append(type_first_token.value)
+        
+        if type_first_token.token_type == TokenType.KEYWORD:
+            if type_first_token.value.upper() == "CHARACTER":
+                ahead_tok = self.look_ahead()
+                if ahead_tok.value.upper() == "VARYING":
+                    type_tokens.append(ahead_tok.value)
+                    self.advance()
+            elif type_first_token.value.upper() == "DOUBLE":
+                ahead_tok = self.look_ahead()
+                if ahead_tok.value.upper() == "PRECISION":
+                    type_tokens.append(ahead_tok.value)
+                    self.advance()
+                        
+        data_type = ' '.join(type_tokens).lower()           
         # Parse type parameters if present
         if self.match('('):
             param_tokens = []
@@ -753,8 +792,7 @@ class SQLParser:
             
             if param_tokens:
                 params.append(''.join(param_tokens))
-            self.consume(')', "Expected ')' after type parameters")
-        
+            self.consume(')', "Expected ')' after type parameters")        
         return data_type, params
     
     def parse_object_name(self) -> Tuple[str, Optional[str], Optional[str]]:
@@ -778,21 +816,23 @@ class SQLParser:
     
     def parse_expression(self) -> str:
         tokens = []
-        depth = 0
-        
+        depth = []        
         while not self.is_at_end():
-            if self.check('('):
-                depth += 1
+            if not depth and ( self.check(',') or  self.check(')') ):
+                break  
+            elif self.check('('):
+                tokens.append(self.peek())
+                self.advance()
+                depth.append(True)            
             elif self.check(')'):
-                if depth == 0:
-                    break
-                depth -= 1
-            
-            tokens.append(self.advance().value)
-            if depth == 0 and not self.check(','):
-                break
+                depth.pop()
+                tokens.append(self.peek())
+                self.advance()
+            else:
+                tokens.append(self.peek())
+                self.advance()
         
-        return ' '.join(tokens)
+        return ' '.join([tok.value for tok in tokens])
     
     def parse_default_value(self) -> str:
         tokens = []
@@ -837,6 +877,18 @@ class SQLParser:
             return token.token_type == value
         return token.value.upper() == value.upper()
     
+    def look_ahead(self, ahead:int = 1):
+        if self.is_at_end() or self.current+1 >= len(self.tokens):
+            return None
+        return self.tokens[self.current+1]
+    
+    def check_ahead(self,  tok_value,  ahead:int = 1):
+        tok = self.look_ahead(ahead)
+        if tok is None:
+            return False
+        return tok.value == tok_value
+        
+    
     def match(self, *args: Any) -> bool:
         for value in args:
             if self.check(value):
@@ -861,7 +913,7 @@ class SQLParser:
         key = table.get_qualified_name()
         self.tables[key] = table
     
-    def get_tables(self) -> List[Table]:
+    def get_tables(self) -> List[Table]:        
         return list(self.tables.values())
     
     def get_table(self, table_name: str, schema: Optional[str] = None, 
@@ -886,52 +938,3 @@ class SQLParser:
         
         return None
 
-# Example Usage
-if __name__ == "__main__":
-    ddl_script = """
-    CREATE TABLE public.users (
-        user_id SERIAL PRIMARY KEY,
-        username VARCHAR(50) NOT NULL UNIQUE,
-        email VARCHAR(255) NOT NULL CONSTRAINT valid_email CHECK (email ~* '^[\\w\\-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$'),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        country_id INT NOT NULL REFERENCES countries(id)
-    );
-    
-    CREATE TABLE countries (
-        id INT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        continent VARCHAR(50)
-    );
-    
-    ALTER TABLE public.users ADD COLUMN last_login TIMESTAMP;
-    ALTER TABLE public.users ADD CONSTRAINT fk_country 
-        FOREIGN KEY (country_id) REFERENCES countries(id);
-    
-    CREATE VIEW user_summary AS
-        SELECT u.username, c.name AS country, COUNT(*) AS login_count
-        FROM public.users u
-        JOIN countries c ON u.country_id = c.id
-        GROUP BY u.username, c.name;
-    """
-    
-    parser = SQLParser()
-    parser.parse_script(ddl_script)
-    
-    # Get all tables
-    print("All Tables:")
-    for table in parser.get_tables():
-        print(f"- {table.get_qualified_name()} ({table.table_type})")
-    
-    # Get specific table
-    print("\nUsers Table Details:")
-    users_table = parser.get_table("users", "public")
-    if users_table:
-        print(f"Columns: {list(users_table.columns.keys())}")
-        print(f"Primary Key: {users_table.primary_key}")
-        print(f"Foreign Keys: {users_table.foreign_keys}")
-    
-    # Get view
-    print("\nView Details:")
-    view = parser.get_table("user_summary")
-    if view:
-        print(f"View definition: {view.view_definition[:100]}...")
