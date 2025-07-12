@@ -32,10 +32,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/python-pgsql-parser"
-Documentation = "https://github.com/yourusername/python-pgsql-parser/docs"
-Source = "https://github.com/yourusername/python-pgsql-parser"
-Tracker = "https://github.com/yourusername/python-pgsql-parser/issues"
+Homepage = "https://github.com/devsunny/python-pgsql-parser"
+Documentation = "https://github.com/devsunny/python-pgsql-parser/docs"
+Source = "https://github.com/devsunny/python-pgsql-parser"
+Tracker = "https://github.com/devsunny/python-pgsql-parser/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

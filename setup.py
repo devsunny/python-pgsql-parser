@@ -37,8 +37,8 @@ setup(
         "dev": ["pytest>=7.0", "twine>=4.0", "coverage>=6.0"],
     },
     project_urls={
-        "Documentation": "https://github.com/yourusername/python-pgsql-parser/docs",
-        "Source": "https://github.com/yourusername/python-pgsql-parser",
-        "Tracker": "https://github.com/yourusername/python-pgsql-parser/issues",
+        "Documentation": "https://github.com/devsunny/python-pgsql-parser/docs",
+        "Source": "https://github.com/devsunny/python-pgsql-parser",
+        "Tracker": "https://github.com/devsunny/python-pgsql-parser/issues",
     },
 )
