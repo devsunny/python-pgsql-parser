@@ -33,7 +33,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/devsunny/python-pgsql-parser"
-Documentation = "https://github.com/devsunny/python-pgsql-parser/docs"
+Documentation = "https://github.com/devsunny/python-pgsql-parser/blob/main/docs/index.md"
 Source = "https://github.com/devsunny/python-pgsql-parser"
 Tracker = "https://github.com/devsunny/python-pgsql-parser/issues"
 
