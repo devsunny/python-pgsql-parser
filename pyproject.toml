@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-pgsql-parser"
-version = "0.1.1"
+version = "0.1.2"
 description = "Advanced PostgreSQL SQL parser for extracting database schema metadata"
 readme = "README.md"
 requires-python = ">=3.7"
