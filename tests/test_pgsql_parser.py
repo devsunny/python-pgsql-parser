@@ -137,6 +137,7 @@ class TestSQLParser:
             name VARCHAR(50)
         );
         """
+        parser.reset()
         parser.parse_script(sql)
         table = parser.get_table("users", "public")
         
@@ -259,6 +260,7 @@ class TestSQLParser:
         CREATE TABLE users (id INT, name VARCHAR(50), email VARCHAR(255));
         ALTER TABLE users DROP COLUMN email;
         """
+        parser.reset()
         parser.parse_script(sql)
         table = parser.get_table("users")
         
@@ -398,6 +400,8 @@ class TestSQLParser:
             product_id INT REFERENCES products(id)
         );
         """
+        parser.reset()
+        print(parser.get_table("order_items"))
         parser.parse_script(sql)
         table = parser.get_table("order_items")
         
@@ -430,6 +434,7 @@ class TestSQLParser:
             PRIMARY KEY (order_id, item_id)
         );
         """
+        parser.reset()
         parser.parse_script(sql)
         table = parser.get_table("order_items")
         
@@ -506,5 +511,5 @@ class TestSQLParser:
         parser.parse_script(sql)
         table = parser.get_table("products")
         
-        assert table.columns["name"].default == "'Unnamed Product'"
-        assert table.columns["created_at"].default == "CURRENT_TIMESTAMP"
+        assert table.columns["name"].default_value == "'Unnamed Product'"
+        assert table.columns["created_at"].default_value == "CURRENT_TIMESTAMP"
