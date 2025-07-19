@@ -1,13 +1,14 @@
 import pytest
 from pgsql_parser import SQLLexer, SQLParser, TokenType, Token
 
+
 # Test SQLLexer
 class TestSQLLexer:
     def test_tokenize_basic(self):
         lexer = SQLLexer()
         sql = "SELECT * FROM users;"
         tokens = lexer.tokenize(sql)
-        
+
         assert len(tokens) == 5
         assert tokens[0].token_type == TokenType.KEYWORD
         assert tokens[0].value == "SELECT"
@@ -24,7 +25,7 @@ class TestSQLLexer:
         lexer = SQLLexer()
         sql = 'SELECT "userName" FROM "public"."users";'
         tokens = lexer.tokenize(sql)
-        
+
         assert tokens[1].token_type == TokenType.QUOTED_IDENTIFIER
         assert tokens[1].value == '"userName"'
         assert tokens[3].token_type == TokenType.QUOTED_IDENTIFIER
@@ -36,7 +37,7 @@ class TestSQLLexer:
         lexer = SQLLexer()
         sql = "WHERE name = 'John''s Cafe';"
         tokens = lexer.tokenize(sql)
-        
+
         assert tokens[3].token_type == TokenType.STRING_LITERAL
         assert tokens[3].value == "'John''s Cafe'"
 
@@ -44,7 +45,7 @@ class TestSQLLexer:
         lexer = SQLLexer()
         sql = "VALUES (123, 45.67, 1e-5);"
         tokens = lexer.tokenize(sql)
-        
+
         assert tokens[2].token_type == TokenType.NUMERIC_LITERAL
         assert tokens[2].value == "123"
         assert tokens[4].token_type == TokenType.NUMERIC_LITERAL
@@ -60,7 +61,7 @@ class TestSQLLexer:
         comment */
         """
         tokens = lexer.tokenize(sql)
-        
+
         assert tokens[0].token_type == TokenType.COMMENT
         assert tokens[0].value == "-- This is a comment"
         assert tokens[6].token_type == TokenType.COMMENT
@@ -74,7 +75,7 @@ class TestSQLLexer:
         UPDATE users SET name = 'John' WHERE id = 1;
         """
         statements = lexer.split_sql_statements(sql)
-        
+
         assert len(statements) == 3
         assert statements[0].startswith("CREATE TABLE")
         assert statements[1].startswith("INSERT INTO")
@@ -92,10 +93,11 @@ class TestSQLLexer:
         SELECT add(1, 2);
         """
         statements = lexer.split_sql_statements(sql)
-        
+
         assert len(statements) == 2
         assert statements[0].startswith("CREATE FUNCTION")
         assert statements[1].startswith("SELECT add")
+
 
 # Test SQLParser
 class TestSQLParser:
@@ -113,19 +115,19 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         tables = parser.get_tables()
-        
+
         assert len(tables) == 1
         table = tables[0]
         assert table.name == "users"
         assert len(table.columns) == 3
-        
+
         # Verify columns
         assert "id" in table.columns
         assert table.columns["id"].data_type == "serial"
         assert table.columns["id"].is_primary
         assert not table.columns["name"].nullable
         assert table.columns["email"].nullable
-        
+
         # Verify primary key
         assert table.primary_key is not None
         assert table.primary_key.columns == ["id"]
@@ -140,7 +142,7 @@ class TestSQLParser:
         parser.reset()
         parser.parse_script(sql)
         table = parser.get_table("users", "public")
-        
+
         assert table is not None
         assert table.name == "users"
         assert table.schema == "public"
@@ -159,14 +161,14 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("orders")
-        
+
         # Verify columns
         assert table.columns["order_id"].is_primary
         assert not table.columns["user_id"].nullable
         assert table.columns["amount"].data_type == "decimal"
         assert table.columns["amount"].numeric_precision == 10
         assert table.columns["amount"].numeric_scale == 2
-        
+
         # Verify foreign key
         assert len(table.foreign_keys) == 1
         fk = table.foreign_keys[0]
@@ -174,7 +176,7 @@ class TestSQLParser:
         assert fk.columns == ["user_id"]
         assert fk.ref_table == "users"
         assert fk.ref_columns == ["id"]
-        
+
         # Verify check constraint
         assert len(table.constraints) == 1
         constraint = table.constraints[0]
@@ -191,7 +193,7 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("temp_data")
-        
+
         assert table is not None
         assert table.table_type == "TEMPORARY TABLE"
 
@@ -202,11 +204,11 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("active_users")
-        
+
         assert table is not None
         assert table.is_view
         assert not table.is_materialized
-        
+
         assert "SELECT id , name" in table.view_definition
 
     def test_create_materialized_view(self, parser):
@@ -218,7 +220,7 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("user_stats")
-        
+
         assert table is not None
         assert table.is_view
         assert table.is_materialized
@@ -231,7 +233,7 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("users")
-        
+
         assert len(table.columns) == 2
         assert "name" in table.columns
         assert table.columns["name"].data_type == "varchar"
@@ -246,10 +248,10 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("users")
-        
+
         assert table.primary_key is not None
         assert table.primary_key.columns == ["id"]
-        
+
         assert len(table.constraints) == 1
         constraint = table.constraints[0]
         assert constraint.ctype == "UNIQUE"
@@ -263,7 +265,7 @@ class TestSQLParser:
         parser.reset()
         parser.parse_script(sql)
         table = parser.get_table("users")
-        
+
         assert len(table.columns) == 2
         assert "email" not in table.columns
         assert "name" in table.columns
@@ -276,7 +278,7 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         # Indexes are not directly stored in table, but we can verify parsing doesn't fail
-        
+
         # For this test, we'll just make sure no exceptions are raised
         assert len(parser.get_tables()) == 1
 
@@ -287,19 +289,19 @@ class TestSQLParser:
         CREATE TABLE reporting.metrics (metric_id INT);
         """
         parser.parse_script(sql)
-        
+
         # Get by full qualified name
         table1 = parser.get_table("users", "public")
         assert table1 is not None
-        
+
         # Get by table name only (should return first match)
         table2 = parser.get_table("orders")
         assert table2 is None  # Shouldn't find without schema
-        
+
         # Get with schema
         table3 = parser.get_table("orders", "sales")
         assert table3 is not None
-        
+
         # Non-existent table
         table4 = parser.get_table("non_existent")
         assert table4 is None
@@ -312,9 +314,9 @@ class TestSQLParser:
         CREATE MATERIALIZED VIEW mat_view AS SELECT 1;
         """
         parser.parse_script(sql)
-        
+
         tables = {t.name: t for t in parser.get_tables()}
-        
+
         assert tables["regular_table"].table_type == "TABLE"
         assert tables["temp_table"].table_type == "TEMPORARY TABLE"
         assert tables["my_view"].table_type == "VIEW"
@@ -333,7 +335,7 @@ class TestSQLParser:
         parser.parse_script(sql)
         table = parser.get_table("products")
         columns = table.columns
-        
+
         # Verify column properties
         assert columns["product_id"].is_primary
         assert columns["product_id"].primary_key_position == 1
@@ -343,7 +345,7 @@ class TestSQLParser:
         assert columns["price"].numeric_precision == 10
         assert columns["price"].numeric_scale == 2
         assert columns["category_id"].foreign_key_ref is not None
-        assert columns["category_id"].foreign_key_ref[0] == "categories"
+        assert columns["category_id"].foreign_key_ref[1] == "categories"
 
     def test_statement_generator(self, parser):
         sql = """
@@ -352,7 +354,7 @@ class TestSQLParser:
         CREATE TABLE table3 (id INT);
         """
         statements = list(parser.statement_generator(sql))
-        
+
         assert len(statements) == 3
         assert all(s.startswith("CREATE TABLE") for s in statements)
 
@@ -371,7 +373,7 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("MyTable")
-        
+
         assert table is not None
         assert "Full Name" in table.columns
         assert table.columns["Full Name"].data_type == "varchar"
@@ -386,9 +388,9 @@ class TestSQLParser:
         parser.parse_script(sql)
         table = parser.get_table("orders")
         column = table.columns["user_id"]
-        
+
         assert column.foreign_key_ref is not None
-        ref_table, ref_col, _ = column.foreign_key_ref
+        _, ref_table, ref_col = column.foreign_key_ref
         assert ref_table == "users"
         assert ref_col == "id"
 
@@ -404,13 +406,13 @@ class TestSQLParser:
         print(parser.get_table("order_items"))
         parser.parse_script(sql)
         table = parser.get_table("order_items")
-        
+
         assert len(table.foreign_keys) == 2
         fk1, fk2 = table.foreign_keys
-        
+
         assert fk1.columns == ["order_id"]
         assert fk1.ref_table == "orders"
-        
+
         assert fk2.columns == ["product_id"]
         assert fk2.ref_table == "products"
 
@@ -421,7 +423,7 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("users")
-        
+
         assert "name" in table.columns
         assert "full_name" not in table.columns
         assert table.columns["name"].data_type == "varchar"
@@ -437,10 +439,10 @@ class TestSQLParser:
         parser.reset()
         parser.parse_script(sql)
         table = parser.get_table("order_items")
-        
+
         assert table.primary_key is not None
         assert table.primary_key.columns == ["order_id", "item_id"]
-        
+
         # Verify column properties
         assert table.columns["order_id"].is_primary
         assert table.columns["order_id"].primary_key_position == 1
@@ -483,20 +485,20 @@ class TestSQLParser:
         ALTER TABLE sales.customers ADD COLUMN phone VARCHAR(20);
         ALTER TABLE hr.employees ADD COLUMN hire_date DATE;
         """
-        
+
         parser.parse_script(large_sql)
         tables = parser.get_tables()
-        
+
         assert len(tables) == 4
         assert parser.get_table("customers", "sales") is not None
         assert parser.get_table("orders", "sales") is not None
         assert parser.get_table("employees", "hr") is not None
         assert parser.get_table("customer_orders", "sales") is not None
-        
+
         # Verify column additions
         customers = parser.get_table("customers", "sales")
         assert "phone" in customers.columns
-        
+
         employees = parser.get_table("employees", "hr")
         assert "hire_date" in employees.columns
 
@@ -510,6 +512,6 @@ class TestSQLParser:
         """
         parser.parse_script(sql)
         table = parser.get_table("products")
-        
+
         assert table.columns["name"].default_value == "'Unnamed Product'"
         assert table.columns["created_at"].default_value == "CURRENT_TIMESTAMP"
