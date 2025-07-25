@@ -1,6 +1,5 @@
-import re
 import json
-from typing import List, Dict, Optional, Tuple, Any, Generator
+from typing import List, Dict, Optional
 from .sqlparser import SQLLexer, Token, TokenType
 
 
