@@ -57,6 +57,7 @@ class SQLLexer:
             "JSON",
             "JSONB",
             "UUID",
+            "CROSS",
             "BYTEA",
             # DDL commands
             "CREATE",
