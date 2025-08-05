@@ -1,7 +1,7 @@
 import pytest
 from typing import List
-from pgsql_parser.sql_lexer import AdvancedSQLLexer, TokenType, Token, VOID_TOKEN
-from pgsql_parser.sql_parser import AdvancedSQLParser, Statement
+from pgsql_parser.models import TokenType, Token
+from pgsql_parser.sql_parser import AdvancedStatementAnalyzer, Statement
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_simple_select_statement_parsing(create_tokens):
         (TokenType.IDENTIFIER, "users"),
     ]
     tokens = create_tokens(token_specs)
-    parser = AdvancedSQLParser(tokens)
+    parser = AdvancedStatementAnalyzer(tokens)
 
     # The parser should simply append the tokens to the AST for a simple statement
     expected_ast = [
@@ -60,7 +60,7 @@ def test_select_with_enclosed_expression(create_tokens):
         (TokenType.IDENTIFIER, "result"),
     ]
     tokens = create_tokens(token_specs)
-    parser = AdvancedSQLParser(tokens)
+    parser = AdvancedStatementAnalyzer(tokens)
 
     # The parser should simply add the tokens to the AST
     expected_ast_values = [
@@ -112,7 +112,7 @@ def test_simple_subquery_parsing(create_tokens):
     closing_tokens[0].start_position = start_pos
     closing_tokens[1].start_position = start_pos + 1
 
-    parser = AdvancedSQLParser(all_tokens)
+    parser = AdvancedStatementAnalyzer(all_tokens)
     # The AST should contain the outer tokens and a nested Statement object for the subquery
     assert parser.statement.ast[0].token_type == TokenType.KEYWORD
     assert parser.statement.ast[0].value == "SELECT"
@@ -167,7 +167,7 @@ def test_nested_subquery_parsing(create_tokens):
         tok.start_position = pos
         pos += 1
 
-    parser = AdvancedSQLParser(tokens)
+    parser = AdvancedStatementAnalyzer(tokens)
 
     # Outer query AST
     assert parser.statement.ast[0].value == "SELECT"

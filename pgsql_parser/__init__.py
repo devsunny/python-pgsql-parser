@@ -1,8 +1,8 @@
-from .sqlparser import (
-    SQLLexer,
-    SQLParser,
+from .models import (
     TokenType,
     Token,
+    VOID_TOKEN,
+    Statement,
     Table,
     Column,
     PrimaryKey,
@@ -10,14 +10,18 @@ from .sqlparser import (
     Constraint,
     Index,
 )
-from .sql_query_parser import SimpleSqlQueryParser
+from .sql_lexer import AdvancedSQLLexer as SQLLexer
+from .sql_parser import AdvancedDDLParser as SQLDDLParser
+
 
 __all__ = [
     "SQLLexer",
-    "SQLParser",
+    "SQLDDLParser",
     "SimpleSqlQueryParser",
     "TokenType",
     "Token",
+    "VOID_TOKEN",
+    "Statement",
     "Table",
     "Column",
     "PrimaryKey",

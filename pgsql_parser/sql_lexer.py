@@ -1,9 +1,7 @@
-import sys
 import re
-import os
+from typing import List
+from .models import Token, TokenType
 
-from enum import Enum
-from typing import List, Dict, Optional, Tuple, Any, Generator
 
 _sql_keywords = [
     # Data types
@@ -25,6 +23,7 @@ _sql_keywords = [
     "FLOAT",
     "DOUBLE",
     "PRECISION",
+    "COLLATE",
     "DATE",
     "TIME",
     "TIMESTAMP",
@@ -104,6 +103,7 @@ _sql_keywords = [
     "ILIKE",
     "IS",
     "EXISTS",
+    "ONLY",
     # Functions
     "COUNT",
     "SUM",
@@ -147,55 +147,6 @@ _sql_keywords = [
     "CLUSTER",
     "WITH",
 ]
-
-
-class TokenType(Enum):
-    HIDDEN = 0
-    KEYWORD = 1
-    IDENTIFIER = 2
-    QUOTED_IDENTIFIER = 3
-    STRING_LITERAL = 4
-    NUMERIC_LITERAL = 5
-    OPERATOR = 6
-    PUNCTUATION = 7
-    COMMENT = 8
-    BLOCK_CONTROL = 9
-    OPEN_PAREN = 10
-    CLOSE_PAREN = 11
-    STATEMENT_SEP = 12
-    IDENTIFIER_SEP = 13
-    VOID = 999
-
-
-class Token:
-    __slots__ = (
-        "token_type",
-        "value",
-        "start_position",
-        "end_position",
-        "line_number",
-        "line_postion",
-        "before_token",
-        "after_token",
-    )
-
-    def __init__(self, token_type: TokenType, value: str, start_position: int):
-        self.token_type = token_type
-        self.value = value
-        self.start_position = start_position
-        self.end_position = None
-        self.line_number = 0
-        self.line_postion = 1
-        self.before_token: Any = None
-        self.after_token: Any = None
-
-    def __repr__(self):
-        return (
-            f"Token({self.token_type.name}, '{self.value}', pos={self.start_position})"
-        )
-
-
-VOID_TOKEN = Token(TokenType.VOID, "", -1)
 
 
 class AdvancedSQLLexer:

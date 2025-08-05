@@ -1,6 +1,6 @@
 import pytest
-from pgsql_parser.sql_lexer import (
-    AdvancedSQLLexer,
+from pgsql_parser.sql_lexer import AdvancedSQLLexer
+from pgsql_parser import (
     TokenType,
     Token,
 )  # Replace your_module_name with the actual module name
