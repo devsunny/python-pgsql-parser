@@ -4,85 +4,124 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI Version](https://img.shields.io/pypi/v/python-pgsql-parser.svg)](https://pypi.org/project/python-pgsql-parser/)
 
-A high-performance PostgreSQL SQL parser for extracting comprehensive database schema metadata from DDL scripts.
+# SQLParser Project
+
+## Overview
+SQLParser is a Python library designed to parse and analyze SQL scripts, focusing on Data Definition Language (DDL) statements and SELECT queries. It processes SQL statements to extract structured information about tables, columns, constraints, and query elements, providing a robust foundation for database schema analysis and query processing.
 
 ## Features
+- **DDL Parsing**: Supports parsing of `CREATE TABLE`, `ALTER TABLE`, and `CREATE INDEX` statements to extract table structures, columns, primary keys, foreign keys, and constraints.
+- **SELECT Query Parsing**: Handles `SELECT` statements, including those with Common Table Expressions (CTEs), to identify query structure and column expressions.
+- **Tokenization**: Utilizes an `AdvancedSQLLexer` to tokenize SQL scripts accurately.
+- **Structured Output**: Represents parsed SQL components as structured objects (`Table`, `Column`, `PrimaryKey`, `ForeignKey`, `Constraint`, etc.).
+- **Extensible Architecture**: Built with a modular design using a base parser class (`ParserBase`) for easy extension and maintenance.
 
-- **Complete SQL Parsing**: Tokenizes and parses PostgreSQL DDL statements
-- **Schema Metadata Extraction**:
-  - Database, schema, and table names
-  - Table types (regular, temporary, view, materialized view)
-  - Column definitions with data types, lengths, precision, and constraints
-  - Primary keys, foreign keys, indexes, and constraints
-- **Advanced SQL Support**:
-  - Quoted identifiers
-  - ANSI SQL and PostgreSQL-specific syntax
-  - CREATE/ALTER TABLE statements
-  - View and materialized view definitions
-- **Powerful API**:
-  - Parse entire scripts or individual statements
-  - Retrieve tables by qualified name
-  - Iterate through parsed statements
-- **Well-Tested**: Comprehensive test suite with 95%+ coverage
-
-## Installation
+## Source Installation
+To use the SQLParser library, ensure you have Python 3.8+ installed. Clone the repository and install dependencies:
 
 ```bash
-pip install python-pgsql-parser
+git clone https://github.com/devsunny/python-pgsql-parser.git
+cd sqlparser
+pip install -r requirements.txt
 ```
 
-## Quick Start
+## Pip installation
+```bash
+pip install python-pgsql-parser
+
+```
+## Usage
+The `AdvancedSQLParser` class is the main entry point for parsing SQL scripts. Below is an example of how to use it:
 
 ```python
-from pgsql_parser import SQLParser
+from sqlparser import AdvancedSQLParser
 
-# Parse SQL script
+# Example SQL script
 sql_script = """
-CREATE TABLE public.users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    email VARCHAR(255) UNIQUE
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100),
+    FOREIGN KEY (email) REFERENCES accounts(email)
 );
-
-CREATE VIEW user_emails AS
-SELECT id, email FROM public.users;
+SELECT username, email FROM users;
 """
 
-parser = SQLParser(sql_script)
+# Initialize parser and parse the script
+parser = AdvancedSQLParser(sql_script)
 
-
-# Get all tables
+# Access parsed tables
 tables = parser.get_tables()
-for table in tables:
-    print(f"Table: {table.schema}.{table.name} ({table.table_type})")
-
-# Get specific table
-users_table = parser.get_table("users", schema="public")
-if users_table:
-    print(f"\nColumns in users table:")
-    for col_name, column in users_table.columns.items():
-        print(f"- {col_name}: {column.data_type}")
+for table_name, table in tables.items():
+    print(f"Table: {table.name}")
+    for col_name, column in table.columns.items():
+        print(f"  Column: {col_name}, Type: {column.col_type}, Nullable: {column.nullable}")
+    if table.primary_key:
+        print(f"  Primary Key: {table.primary_key.columns}")
+    for fk in table.foreign_keys:
+        print(f"  Foreign Key: {fk.columns} -> {fk.ref_table}({fk.ref_columns})")
 ```
 
-## Documentation
+### Output
+For the above SQL script, the parser will output structured information about the `users` table, its columns, primary key, foreign key, and the `SELECT` query components.
 
-### Core Classes
+## Project Structure
+- **sqlparser/models.py**: Defines data models (`Token`, `TokenType`, `Table`, `Column`, `PrimaryKey`, `ForeignKey`, `Constraint`, etc.) for representing SQL components.
+- **sqlparser/sql_lexer.py**: Implements `AdvancedSQLLexer` for tokenizing SQL scripts.
+- **sqlparser/parser_base.py**: Provides the base `ParserBase` class with utility methods for token consumption and parsing.
+- **sqlparser/advanced_statement_analyzer.py**: Analyzes SQL statements and handles nested subqueries.
+- **sqlparser/column_def_parser.py**: Parses column definitions, including data types, constraints, and foreign key references.
+- **sqlparser/advanced_ddl_statement_parser.py**: Parses DDL statements (`CREATE TABLE`, `ALTER TABLE`, `CREATE INDEX`).
+- **sqlparser/sql_query_parser.py**: Parses `SELECT` queries, including CTEs and column expressions.
+- **sqlparser/advanced_sql_parser.py**: Main parser class that orchestrates the parsing process and maintains the table registry.
 
-- `SQLParser`: Main parser class
-- `Table`: Represents a table/view definition
-- `Column`: Contains column metadata
-- `PrimaryKey`, `ForeignKey`, `Constraint`: Schema constraint objects
+## Code Example
+Below is a snippet from `column_def_parser.py` that demonstrates how column definitions are parsed:
 
-### Key Methods
+<xaiArtifactCode>
+from typing import List
+from .models import Token, TokenType, Column, PrimaryKey, ForeignKey, Constraint
+from .parser_base import ParserBase
 
-- `parse_script(sql_script)`: Parse entire SQL script
-- `parse_statement(sql)`: Parse single SQL statement
-- `get_tables()`: Get all parsed tables/views
-- `get_table(name, schema, database)`: Get specific table by qualified name
-- `statement_generator(sql_script)`: Iterate through SQL statements
+class ColumnDefParser(ParserBase):
+    def __init__(self, col_def: List[Token]):
+        super().__init__(col_def)
+        self.col_name = None
+        self.col_type = None
+        self.nullable = True
+        self.default_value = None
+        self.is_primary = False
+        self.fk_ref = None
+        self.max_char_length = None
+        self.precision = 0
+        self.scale = 0
+        self.primary_key = None
+        self.foreign_key = None
+        self.constraint = None
+        self.foreign_key_ref = None
+        self._parse()
 
-## Usage Examples
- - Please see Unit Test examples
+    def _parse_column_def(self):
+        while self.current_pos < self.num_of_tokens:
+            tok = self._consume_one()
+            if self.col_name is None:
+                self.col_name = tok.value
+            elif self.col_type is None:
+                self.col_type = tok.value.upper()
+            elif tok.token_type == TokenType.OPEN_PAREN:
+                self._parse_precision_scale()
+                self._consume_one()  # consume close_paren
+            elif self._is_keyword(tok, "NOT") and self._is_keyword(self._peek(), "NULL"):
+                self.nullable = False
+                self._consume_one()  # consume null
+            # ... (additional parsing logic)
+</xaiArtifactCode>
+
+## Dependencies
+- Python 3.8+
+- `typing` (standard library)
+- `collections.OrderedDict` (standard library)
+
 
 ## Contributing
 
