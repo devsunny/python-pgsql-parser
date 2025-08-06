@@ -94,9 +94,25 @@ class ParserBase:
             tok.token_type == TokenType.KEYWORD and tok.uval() == keyword_name.upper()
         )
 
+    def _is_comma(self, tok: Token):
+        return tok.token_type == TokenType.PUNCTUATION and tok.value == ","
+
+    def _is_possible_column(self, tok: Token):
+        return tok.token_type in [
+            TokenType.IDENTIFIER,
+            TokenType.QUOTED_IDENTIFIER,
+            TokenType.KEYWORD,
+        ]
+
+    def _is_expr_ending(self, tok: Token):
+        return tok.token_type == TokenType.CLOSE_PAREN or self._is_keyword(tok, "END")
+
     def debug(self, header=None):
         header = header if header else "DEBUG"
         print(
             header,
             " ".join(t.value for t in self.tokens[self.current_pos :]),
         )
+
+    def to_string(self):
+        return " ".join(t.value for t in self.tokens)

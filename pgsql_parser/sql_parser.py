@@ -384,7 +384,110 @@ class AdvancedDDLStatementParser(ParserBase):
         pass
 
 
-class AdvancedDDLParser:
+class SQLQueryParser(ParserBase):
+
+    def __init__(self, statement: Statement, parsed_tables: Dict[str, Table]):
+        self.table = None
+        self.statement = statement
+        super().__init__(self.statement.ast)
+        self.parsed_tables = parsed_tables
+        self.current_table = None
+        self.cte_queries = None
+        self._parse()
+
+    def _parse(self):
+        if self._is_keyword(self._peek(), "WITH"):
+            self._parse_cte()
+        else:
+            self._parse_select()
+
+    def _parse_cte_with(self):
+        cte_queries = {}
+        while (
+            not self._is_keyword(self._peek(), "SELECT") and self._peek() != VOID_TOKEN
+        ):
+            alias = self._consume_one()
+            self._consume_one()  # AS
+            self._consume_one()  # (
+            stmt = self._consume_one()
+            self._consume_one()  # )
+            if (
+                self._peek().token_type == TokenType.PUNCTUATION
+                and self._peek().value == ","
+            ):
+                self._consume_one()
+            cte_queries[alias] = stmt
+        return cte_queries
+
+    def _parse_cte(self):
+        self._consume_one()
+        self.cte_queries = self._parse_cte_with()
+        self._parse_select()
+
+    def _parse_select(self):
+        self._consume_one()  # Select
+        self.current_table = Table(self.to_string(), None, None, "QUERY")
+        while not self._is_keyword(self._peek(), "FROM") and self._peek() != VOID_TOKEN:
+            self._parse_select_element()
+
+    def _parse_select_element(self):
+        col_tok = self._consume_one()
+        col_tok2 = self._consume_one()
+        expr = None
+        alias = None
+        if self._is_comma(col_tok2):
+            alias = col_tok.value
+            expr = col_tok.value
+        elif self._is_keyword(col_tok2, "AS"):
+            alias = self._consume_one()
+            expr = col_tok.value
+            self._consume_one()  # comma
+        elif self._is_possible_column(col_tok2) and self._is_comma(self._peek()):
+            alias = col_tok2.value
+            expr = col_tok.value
+            self._consume_one()  # comma
+        else:
+            stack = 0
+            expr_buf = [col_tok, col_tok2]
+            while (
+                not self._is_keyword(self._peek(), "FROM")
+                and self._peek() != VOID_TOKEN
+            ):
+                tok = self._consume_one()
+                if tok.token_type == TokenType.OPEN_PAREN:
+                    stack += 1
+                elif tok.token_type == TokenType.CLOSE_PAREN:
+                    stack -= 1
+                if self._is_comma(tok) and stack == 0:
+                    break
+                else:
+                    expr_buf.append(tok)
+
+            self._consume_one()  # comma
+            last_token = expr_buf[-1]
+            if self._is_expr_ending(last_token):
+                expr = " ".join(t.value for t in expr_buf)
+                alias = None
+            elif self._is_possible_column(last_token) and self._is_keyword(
+                expr_buf[-2], "AS"
+            ):
+                expr = " ".join(t.value for t in expr_buf[0:-2])
+                alias = last_token.value
+            elif self._is_possible_column(last_token):
+                expr = " ".join(t.value for t in expr_buf[0:-1])
+                alias = last_token.value
+            else:
+                expr = " ".join(t.value for t in expr_buf)
+                alias = None
+
+        col = Column("", alias, "VARCHAR", True, None, None)
+        col.alias = alias
+        col.expr = expr
+        self.current_table.add_column(col)
+
+
+class AdvancedSQLParser:
+
     def __init__(self, sql_script: str):
         self.lexer = AdvancedSQLLexer(sql_script)
         self.tables = OrderedDict()
@@ -393,7 +496,14 @@ class AdvancedDDLParser:
     def _parse(self):
         for ddl_stmt_tokens in self.lexer.get_statements():
             analyzer = AdvancedStatementAnalyzer(ddl_stmt_tokens)
-            parser = AdvancedDDLStatementParser(analyzer.statement, self.tables)
+            first_token = analyzer.statement.ast[0]
+            if (
+                first_token.token_type == TokenType.KEYWORD
+                and first_token.value.upper() in ["SELECT", "WITH"]
+            ):
+                parser = SQLQueryParser(analyzer.statement, self.tables)
+            else:
+                parser = AdvancedDDLStatementParser(analyzer.statement, self.tables)
             table = parser.current_table
             if table is not None:
                 self.tables[table.name] = table

@@ -16,6 +16,8 @@ class Column:
         "primary_key_position",
         "foreign_key_ref",
         "constraints",
+        "expr",
+        "alias",
     )
 
     def __init__(
@@ -36,6 +38,8 @@ class Column:
         self.char_length: Optional[int] = None
         self.numeric_precision: Optional[int] = None
         self.numeric_scale: Optional[int] = None
+        self.expr = None
+        self.alias = None
         self.primary_key_position: Optional[int] = None
         self.foreign_key_ref: Optional[Tuple[str, str, str]] = None
         self.constraints: List[Dict] = []  # For column-level constraints
@@ -217,6 +221,7 @@ class TokenType(Enum):
     STATEMENT_SEP = 12
     IDENTIFIER_SEP = 13
     VOID = 999
+    STATEMENT = 1000
 
 
 class Token:
@@ -257,6 +262,7 @@ class Statement:
     def __init__(self, tokens):
         self.tokens = tokens
         self.ast = []
+        self.token_type = TokenType.STATEMENT
 
     def get_statement_ast(self):
         return self.ast

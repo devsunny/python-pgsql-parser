@@ -11,12 +11,12 @@ from .models import (
     Index,
 )
 from .sql_lexer import AdvancedSQLLexer as SQLLexer
-from .sql_parser import AdvancedDDLParser as SQLDDLParser
+from .sql_parser import AdvancedSQLParser as SQLParser
 
 
 __all__ = [
     "SQLLexer",
-    "SQLDDLParser",
+    "SQLParser",
     "SimpleSqlQueryParser",
     "TokenType",
     "Token",
