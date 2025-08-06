@@ -36,9 +36,6 @@ pip install python-pgsql-parser
 ```python
 from pgsql_parser import SQLParser
 
-# Initialize parser
-parser = SQLParser()
-
 # Parse SQL script
 sql_script = """
 CREATE TABLE public.users (
@@ -51,7 +48,8 @@ CREATE VIEW user_emails AS
 SELECT id, email FROM public.users;
 """
 
-parser.parse_script(sql_script)
+parser = SQLParser(sql_script)
+
 
 # Get all tables
 tables = parser.get_tables()
@@ -84,54 +82,7 @@ if users_table:
 - `statement_generator(sql_script)`: Iterate through SQL statements
 
 ## Usage Examples
-
-### Extract Table Metadata
-
-```python
-table = parser.get_table("users", "public")
-
-print(f"Table: {table.schema}.{table.name}")
-print(f"Type: {table.table_type}")
-print(f"Columns: {len(table.columns)}")
-print(f"Primary Key: {table.primary_key.columns if table.primary_key else None}")
-
-print("\nColumn Details:")
-for name, column in table.columns.items():
-    print(f"- {name}: {column.data_type}, " +
-          f"Nullable: {column.nullable}, " +
-          f"Primary Key: {column.is_primary}")
-```
-
-### Handle ALTER TABLE Statements
-
-```python
-sql = """
-ALTER TABLE users 
-ADD COLUMN last_login TIMESTAMP,
-ADD CONSTRAINT fk_country 
-    FOREIGN KEY (country_id) REFERENCES countries(id);
-"""
-
-parser.parse_statement(sql)
-table = parser.get_table("users")
-print(f"New column: {table.columns['last_login'].data_type}")
-print(f"New foreign key: {table.foreign_keys[-1].ref_table}")
-```
-
-### Process Large Scripts
-
-```python
-with open("schema.sql", "r") as f:
-    sql_script = f.read()
-
-for statement in parser.statement_generator(sql_script):
-    parser.parse_statement(statement)
-    
-    # Process tables incrementally
-    new_tables = parser.get_tables()
-    for table in new_tables:
-        save_to_database(table)
-```
+ - Please see Unit Test examples
 
 ## Contributing
 
